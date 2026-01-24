@@ -82,7 +82,11 @@
     }
 
     // 初始化
-    initServers();
+    onMount(async () => {
+        settings = await getSettings();
+        initServers();
+        setupServerListeners();
+    });
 </script>
 
 <div class="mcp-server-selector">

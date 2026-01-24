@@ -95,19 +95,29 @@ export function getAvailableMCPTools(): Tool[] {
     // 由于 MCPManager 需要在浏览器环境中初始化，我们需要确保它已被初始化
     const mcpManager = (window as any).mcpManager;
     if (!mcpManager) {
-        console.warn('MCPManager not initialized');
+        console.warn('MCPManager not initialized, returning empty tool list');
         return [];
     }
 
-    const connectedServers = mcpManager.getConnectedServers();
-    const mcpTools: any[] = [];
+    try {
+        const connectedServers = mcpManager.getConnectedServers();
+        const mcpTools: any[] = [];
 
-    connectedServers.forEach((server: any) => {
-        const serverTools = server.getAvailableTools();
-        mcpTools.push(...serverTools);
-    });
+        connectedServers.forEach((server: any) => {
+            try {
+                const serverTools = server.getAvailableTools();
+                mcpTools.push(...serverTools);
+            } catch (error) {
+                console.error(`Failed to get tools from server ${server.name}:`, error);
+                // 继续处理其他服务器
+            }
+        });
 
-    return mcpTools.map(convertMCPToolToTool);
+        return mcpTools.map(convertMCPToolToTool);
+    } catch (error) {
+        console.error('Failed to get MCP tools:', error);
+        return [];
+    }
 }
 
 export const AVAILABLE_TOOLS: Tool[] = [
@@ -1062,10 +1072,25 @@ async function executeMCPToolCall(toolName: string, args: any): Promise<string> 
     // 由于 MCPManager 需要在浏览器环境中初始化，我们需要确保它已被初始化
     const mcpManager = (window as any).mcpManager;
     if (!mcpManager) {
-        throw new Error('MCPManager not initialized');
+        console.warn('MCPManager not initialized, attempting to initialize...');
+        // 尝试初始化
+        try {
+            // 导入MCP管理器
+            const { mcpManager: importedMCPManager } = await import('../services/mcpService');
+            (window as any).mcpManager = importedMCPManager;
+            await importedMCPManager.initialize();
+        } catch (error) {
+            console.error('MCPManager initialization failed:', error);
+            throw new Error('MCPManager 未初始化，无法调用 MCP 工具');
+        }
     }
 
     const connectedServers = mcpManager.getConnectedServers();
+
+    // 如果没有连接的服务器，返回友好的错误信息
+    if (connectedServers.length === 0) {
+        throw new Error('没有可用的 MCP 服务器连接，请先配置并启用 MCP 服务器');
+    }
 
     // 查找提供该工具的服务器
     for (const server of connectedServers) {
@@ -1084,5 +1109,5 @@ async function executeMCPToolCall(toolName: string, args: any): Promise<string> 
         }
     }
 
-    throw new Error(`未知的工具: ${toolName}`);
+    throw new Error(`未知的工具: ${toolName}，请确保该工具在已连接的 MCP 服务器中可用`);
 }

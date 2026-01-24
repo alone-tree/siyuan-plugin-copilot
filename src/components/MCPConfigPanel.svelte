@@ -1,6 +1,6 @@
 <script lang="ts">
     import { getSettings, updateSettings } from '../stores/settings';
-    import { mcpManager } from '../services/mcpService';
+    import { mcpManager, MCPServer } from '../services/mcpService';
     import { t } from '../utils/i18n';
 
     let settings = getSettings();
@@ -118,7 +118,7 @@
     async function testConnection(server: any) {
         testResult = t('settings.mcp.testing');
         try {
-            const testServer = new (mcpManager.constructor as any).MCPServer(server);
+            const testServer = new MCPServer(server);
             const success = await testServer.testConnection();
             testResult = success ? t('settings.mcp.testSuccess') : t('settings.mcp.testFailed');
         } catch (error) {

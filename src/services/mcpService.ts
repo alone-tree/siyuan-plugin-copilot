@@ -45,6 +45,8 @@ export class MCPServer {
     public prompts: MCPPrompt[];
     public lastError?: string;
 
+    private listeners: Map<string, Function[]> = new Map();
+
     constructor(config: any) {
         this.id = config.id;
         this.name = config.name;
@@ -60,6 +62,26 @@ export class MCPServer {
     }
 
     /**
+     * 添加事件监听器
+     */
+    on(event: string, callback: Function): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event)!.push(callback);
+    }
+
+    /**
+     * 触发事件
+     */
+    private emit(event: string, ...args: any[]): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            callbacks.forEach(callback => callback(...args));
+        }
+    }
+
+    /**
      * 连接到 MCP 服务器
      */
     async connect(): Promise<boolean> {
@@ -68,6 +90,7 @@ export class MCPServer {
         }
 
         this.status = MCPConnectionStatus.CONNECTING;
+        this.emit('statusChange', this.status);
         this.lastError = undefined;
 
         try {
@@ -129,10 +152,12 @@ export class MCPServer {
             ];
 
             this.status = MCPConnectionStatus.CONNECTED;
+            this.emit('statusChange', this.status);
             return true;
         } catch (error) {
             console.error(`Failed to connect to MCP server ${this.name}:`, error);
             this.status = MCPConnectionStatus.ERROR;
+            this.emit('statusChange', this.status);
             this.lastError = error instanceof Error ? error.message : 'Unknown error';
             return false;
         }
@@ -143,6 +168,7 @@ export class MCPServer {
      */
     async disconnect(): Promise<void> {
         this.status = MCPConnectionStatus.DISCONNECTED;
+        this.emit('statusChange', this.status);
         this.tools = [];
         this.resources = [];
         this.prompts = [];
