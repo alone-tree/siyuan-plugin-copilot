@@ -70,6 +70,46 @@ export interface ToolResult {
 
 // ==================== 工具定义 ====================
 
+/**
+ * 将 MCP 工具转换为与现有系统兼容的工具格式
+ */
+export function convertMCPToolToTool(mcpTool: any): Tool {
+    return {
+        type: 'function',
+        function: {
+            name: mcpTool.name,
+            description: mcpTool.description,
+            parameters: mcpTool.parameters || {
+                type: 'object',
+                properties: {},
+                required: []
+            }
+        }
+    };
+}
+
+/**
+ * 获取所有可用的 MCP 工具（转换后的格式）
+ */
+export function getAvailableMCPTools(): Tool[] {
+    // 由于 MCPManager 需要在浏览器环境中初始化，我们需要确保它已被初始化
+    const mcpManager = (window as any).mcpManager;
+    if (!mcpManager) {
+        console.warn('MCPManager not initialized');
+        return [];
+    }
+
+    const connectedServers = mcpManager.getConnectedServers();
+    const mcpTools: any[] = [];
+
+    connectedServers.forEach((server: any) => {
+        const serverTools = server.getAvailableTools();
+        mcpTools.push(...serverTools);
+    });
+
+    return mcpTools.map(convertMCPToolToTool);
+}
+
 export const AVAILABLE_TOOLS: Tool[] = [
 
     // SQL查询工具
@@ -961,6 +1001,7 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
     try {
         const args = JSON.parse(argsStr);
 
+        // 首先检查是否是内置工具
         switch (name) {
             case 'siyuan_sql_query':
                 const results = await siyuan_sql_query(args.sql);
@@ -1005,10 +1046,43 @@ export async function executeToolCall(toolCall: ToolCall): Promise<string> {
                 return JSON.stringify(moveResult, null, 2);
 
             default:
-                throw new Error(`未知的工具: ${name}`);
+                // 不是内置工具，检查是否是 MCP 工具
+                return await executeMCPToolCall(name, args);
         }
     } catch (error) {
         console.error(`Execute tool ${name} error:`, error);
         return `执行工具失败: ${(error as Error).message}`;
     }
+}
+
+/**
+ * 执行 MCP 工具调用
+ */
+async function executeMCPToolCall(toolName: string, args: any): Promise<string> {
+    // 由于 MCPManager 需要在浏览器环境中初始化，我们需要确保它已被初始化
+    const mcpManager = (window as any).mcpManager;
+    if (!mcpManager) {
+        throw new Error('MCPManager not initialized');
+    }
+
+    const connectedServers = mcpManager.getConnectedServers();
+
+    // 查找提供该工具的服务器
+    for (const server of connectedServers) {
+        const serverTools = server.getAvailableTools();
+        const tool = serverTools.find((t: any) => t.name === toolName);
+
+        if (tool) {
+            try {
+                const result = await server.callTool(toolName, args);
+                return JSON.stringify(result, null, 2);
+            } catch (error) {
+                console.error(`Failed to call MCP tool ${toolName} on server ${server.name}:`, error);
+                // 继续尝试下一个服务器
+                continue;
+            }
+        }
+    }
+
+    throw new Error(`未知的工具: ${toolName}`);
 }

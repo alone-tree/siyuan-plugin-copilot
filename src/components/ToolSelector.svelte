@@ -7,7 +7,7 @@
 
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
-    import { AVAILABLE_TOOLS, type Tool } from '../tools';
+    import { AVAILABLE_TOOLS, getAvailableMCPTools, type Tool } from '../tools';
     import { t } from '../utils/i18n';
 
     export let selectedTools: ToolConfig[] = [];
@@ -40,14 +40,23 @@
                 'siyuan_move_documents',
             ],
         },
+        mcp: {
+            name: 'MCP',
+            tools: [], // 动态添加
+        },
     };
 
     // 按类别组织工具
     const categorizedTools: Record<string, Tool[]> = {};
     for (const [category, config] of Object.entries(toolCategories)) {
-        categorizedTools[category] = AVAILABLE_TOOLS.filter(tool =>
-            config.tools.includes(tool.function.name)
-        );
+        if (category === 'mcp') {
+            // 动态获取 MCP 工具
+            categorizedTools[category] = getAvailableMCPTools();
+        } else {
+            categorizedTools[category] = AVAILABLE_TOOLS.filter(tool =>
+                config.tools.includes(tool.function.name)
+            );
+        }
     }
 
     // 切换工具选择
@@ -86,12 +95,13 @@
 
     // 全选/取消全选
     function toggleAll() {
-        if (localSelectedTools.length === AVAILABLE_TOOLS.length) {
+        const allTools = [...AVAILABLE_TOOLS, ...getAvailableMCPTools()];
+        if (localSelectedTools.length === allTools.length) {
             // 取消全选
             localSelectedTools = [];
         } else {
             // 全选
-            localSelectedTools = AVAILABLE_TOOLS.map(tool => ({
+            localSelectedTools = allTools.map(tool => ({
                 name: tool.function.name,
                 autoApprove: false,
             }));
@@ -149,7 +159,7 @@
         <h3>{t('tools.selector.title')}</h3>
         <div class="tool-selector__actions">
             <button class="b3-button b3-button--text" on:click={toggleAll}>
-                {localSelectedTools.length === AVAILABLE_TOOLS.length
+                {localSelectedTools.length === [...AVAILABLE_TOOLS, ...getAvailableMCPTools()].length
                     ? t('tools.selector.deselectAll')
                     : t('tools.selector.selectAll')}
             </button>
@@ -262,7 +272,7 @@
             </div>
         </div>
         <span class="tool-selector__count">
-            {t('tools.selector.selected')}: {localSelectedTools.length}/{AVAILABLE_TOOLS.length}
+            {t('tools.selector.selected')}: {localSelectedTools.length}/{[...AVAILABLE_TOOLS, ...getAvailableMCPTools()].length}
         </span>
     </div>
 </div>

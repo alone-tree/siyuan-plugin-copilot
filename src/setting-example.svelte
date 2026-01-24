@@ -6,6 +6,7 @@
     import { pushMsg, pushErrMsg, lsNotebooks } from './api';
     import { confirm } from 'siyuan';
     import ProviderConfigPanel from './components/ProviderConfigPanel.svelte';
+    import MCPConfigPanel from './components/MCPConfigPanel.svelte';
     import type { CustomProviderConfig } from './defaultSettings';
     export let plugin;
 
@@ -245,6 +246,10 @@
         },
         {
             name: t('settings.settingsGroup.platformManagement'),
+            items: [],
+        },
+        {
+            name: t('settings.settingsGroup.mcpConfig'),
             items: [],
         },
         {
@@ -608,6 +613,8 @@
                     {/if}
                 </main>
             </div>
+        {:else if focusGroup === t('settings.settingsGroup.mcpConfig')}
+            <MCPConfigPanel />
         {:else}
             <SettingPanel
                 group={currentGroup?.name || ''}

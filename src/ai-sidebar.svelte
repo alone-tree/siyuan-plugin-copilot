@@ -34,6 +34,7 @@
     import SessionManager from './components/SessionManager.svelte';
     import ToolSelector, { type ToolConfig } from './components/ToolSelector.svelte';
     import ModelSettingsButton from './components/ModelSettingsButton.svelte';
+    import MCPServerSelector from './components/MCPServerSelector.svelte';
     import type { ProviderConfig } from './defaultSettings';
     import { settingsStore } from './stores/settings';
     import { confirm, Constants } from 'siyuan';
@@ -51,6 +52,7 @@
         createdAt: number;
         updatedAt: number;
         pinned?: boolean; // 是否钉住
+        mcpServers?: string[]; // 会话使用的 MCP 服务器列表（服务器 id）
     }
 
     let messages: Message[] = [];
@@ -119,6 +121,10 @@
     let currentSessionId: string = '';
     let isSessionManagerOpen = false;
     let hasUnsavedChanges = false;
+
+    // MCP 服务器配置
+    let currentMCPServers: string[] = [];
+    let mcpServersModified: boolean = false;
 
     // 在新窗口打开菜单
     let showOpenWindowMenu = false;
@@ -566,6 +572,7 @@
 
     // Agent 模式
     let isToolSelectorOpen = false;
+    let isMCPServerSelectorOpen = false;
     let selectedTools: ToolConfig[] = []; // 选中的工具配置列表
     let toolCallsInProgress: Set<string> = new Set(); // 正在执行的工具调用ID
     let toolCallsExpanded: Record<string, boolean> = {}; // 工具调用是否展开，默认折叠
@@ -2120,9 +2127,18 @@
             let toolsForAgent: any[] | undefined = undefined;
             if (chatMode === 'agent' && selectedTools.length > 0) {
                 // 根据选中的工具名称筛选出对应的工具定义
-                toolsForAgent = AVAILABLE_TOOLS.filter(tool =>
+                // 获取内置工具
+                let toolsForAgent = AVAILABLE_TOOLS.filter(tool =>
                     selectedTools.some(t => t.name === tool.function.name)
                 );
+
+                // 添加 MCP 工具
+                const mcpTools = getAvailableMCPTools();
+                const selectedMCPTools = mcpTools.filter(tool =>
+                    selectedTools.some(t => t.name === tool.function.name)
+                );
+
+                toolsForAgent = [...toolsForAgent, ...selectedMCPTools];
             }
 
             // Agent 模式使用循环调用
@@ -3924,6 +3940,7 @@
                 session.messages = [...messages];
                 session.title = generateSessionTitle();
                 session.updatedAt = now;
+                session.mcpServers = currentMCPServers;
             } else {
                 // 如果会话不存在（可能被其他实例删除），创建为新会话
                 const newSession: ChatSession = {
@@ -3932,6 +3949,7 @@
                     messages: [...messages],
                     createdAt: now,
                     updatedAt: now,
+                    mcpServers: currentMCPServers,
                 };
                 sessions = [newSession, ...sessions];
             }
@@ -3943,6 +3961,7 @@
                 messages: [...messages],
                 createdAt: now,
                 updatedAt: now,
+                mcpServers: currentMCPServers,
             };
             sessions = [newSession, ...sessions];
             currentSessionId = newSession.id;
@@ -4022,6 +4041,18 @@
             currentSessionId = sessionId;
             hasUnsavedChanges = false;
 
+            // 恢复会话级别的 MCP 服务器配置
+            if (session.mcpServers) {
+                currentMCPServers = [...session.mcpServers];
+                mcpServersModified = true;
+            } else {
+                // 如果会话没有保存 MCP 服务器配置，使用全局默认设置
+                currentMCPServers = settings.mcpConfigs
+                    .filter((config: any) => config.enabled)
+                    .map((config: any) => config.id);
+                mcpServersModified = false;
+            }
+
             // 清除多模型状态
             multiModelResponses = [];
             isWaitingForAnswerSelection = false;
@@ -4084,6 +4115,12 @@
         isWaitingForAnswerSelection = false;
         selectedAnswerIndex = null;
         selectedTabIndex = 0;
+
+        // 初始化 MCP 服务器配置（使用全局默认设置）
+        currentMCPServers = settings.mcpConfigs
+            .filter((config: any) => config.enabled)
+            .map((config: any) => config.id);
+        mcpServersModified = false;
     }
 
     async function deleteSession(sessionId: string) {
@@ -6796,6 +6833,16 @@
                 </button>
             {/if}
 
+            <!-- MCP服务器选择按钮 -->
+            <button
+                class="b3-button b3-button--text ai-sidebar__mcp-selector-btn"
+                on:click={() => (isMCPServerSelectorOpen = !isMCPServerSelectorOpen)}
+                title={t('mcp.serverSelector.title')}
+            >
+                <svg class="b3-button__icon"><use xlink:href="#iconCloud"></use></svg>
+                <span>{t('mcp.serverSelector.title')} ({currentMCPServers.length})</span>
+            </button>
+
             <!-- 多模型对话按钮（仅在问答模式下显示） -->
             {#if chatMode === 'ask'}
                 <div class="ai-sidebar__multi-model-selector-wrapper">
@@ -7346,6 +7393,18 @@
     <!-- 工具选择器对话框 -->
     {#if isToolSelectorOpen}
         <ToolSelector bind:selectedTools on:close={() => (isToolSelectorOpen = false)} />
+    {/if}
+
+    {#if isMCPServerSelectorOpen}
+        <MCPServerSelector
+            bind:selectedServerIds={currentMCPServers}
+            bind:isModified={mcpServersModified}
+            on:select={(serverIds) => {
+                currentMCPServers = serverIds;
+                hasUnsavedChanges = true;
+            }}
+            on:close={() => (isMCPServerSelectorOpen = false)}
+        />
     {/if}
 
     <!-- 保存到笔记对话框 -->
@@ -8136,6 +8195,25 @@
     }
 
     .ai-sidebar__tool-selector-btn {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 13px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s;
+
+        &:hover {
+            background: var(--b3-theme-primary-lightest);
+        }
+
+        .b3-button__icon {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    .ai-sidebar__mcp-selector-btn {
         display: flex;
         align-items: center;
         gap: 4px;

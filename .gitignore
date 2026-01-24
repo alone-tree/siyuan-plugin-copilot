@@ -9,3 +9,5 @@ dev
 dist
 build
 tmp
+.claude/settings.local.json
+/docs/plans

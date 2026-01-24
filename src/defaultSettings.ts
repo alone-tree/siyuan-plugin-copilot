@@ -12,6 +12,16 @@ export interface ModelConfig {
     };
 }
 
+export interface MCPConfig {
+    id: string;           // 服务器唯一标识
+    name: string;         // 服务器友好名称
+    url: string;          // 服务器地址
+    apiKey?: string;      // API 密钥
+    timeout: number;      // 超时时间
+    customHeaders: Record<string, string>; // 自定义请求头
+    enabled: boolean;     // 服务器是否启用
+}
+
 export interface ProviderConfig {
     apiKey: string;
     customApiUrl: string;
@@ -33,6 +43,9 @@ export const getDefaultSettings = () => ({
     checkbox: false,
     textarea: t('settings.textarea.value'),
     select: 'option1',
+
+    // MCP 服务器配置
+    mcpConfigs: [] as MCPConfig[],
 
     // AI 设置 - 新的多平台多模型结构
     aiProviders: {

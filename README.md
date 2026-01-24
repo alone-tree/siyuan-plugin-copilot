@@ -31,6 +31,12 @@ See [CHANGELOG.md](https://cdn.jsdelivr.net/gh/Achuan-2/SiYuan-plugin-copilot@ma
   - File Upload (Supports Markdown, text files, etc.)
 - Prompt Management
   - Supports creating and saving commonly used prompts for quick insertion into the input box
+- MCP (Model Context Protocol) Support
+  - Connect to external MCP servers to access additional tools, resources, and context
+  - Manage multiple MCP server configurations
+  - Session-level MCP server selection and configuration
+  - Auto-discovery and integration of MCP tools
+
 
 ## 🔧 Development Related
 
